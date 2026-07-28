@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Model artifacts (large — push to HF Hub, not git)
+*.bin
+*.safetensors
+*.gguf
+checkpoints/
+adapter_model/
+models/
+
+# Data (license-sensitive or large raw files)
+data/raw/*.pdf
+data/raw/*.zip
+
+# Env / secrets
+.env
+*.key
+
+# OS / editor
+Thumbs.db
+.vscode/settings.json
+
+# Logs
+*.log
+results/*.tmp
