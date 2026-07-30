@@ -1,0 +1,63 @@
+# LoRA / QLoRA fine-tuning configuration
+# Trustworthy SLM Agent — Phase 2
+
+base_model: "Qwen/Qwen2.5-1.5B-Instruct"
+
+# LoRA hyperparameters
+lora:
+  r: 16                # rank — higher = more capacity, more memory
+  alpha: 32             # scaling factor, typically 2x r
+  dropout: 0.05
+  target_modules:       # which layers LoRA adapts, standard for Qwen2.5
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+# 4-bit quantization (QLoRA) — needed to fit training on a free Colab T4 (16GB)
+quantization:
+  load_in_4bit: true
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_use_double_quant: true
+
+# Training hyperparameters
+training:
+  num_train_epochs: 3
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4   # effective batch size = 16
+  learning_rate: 2.0e-4
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.03
+  weight_decay: 0.01
+  max_seq_length: 512
+  logging_steps: 5
+  eval_strategy: "epoch"
+  save_strategy: "epoch"
+  save_total_limit: 2
+  seed: 42
+
+# System prompt injected into every training example — defines the
+# assistant's persona for this narrow-domain fine-tune
+system_prompt: >
+  You are a helpful assistant with expert knowledge of the paper
+  "Why Language Models Hallucinate" by Kalai, Nachum, Vempala, and Zhang (2025).
+  Answer questions accurately based on the paper's content. If you are
+  not confident an answer is grounded in the paper, say so honestly
+  rather than guessing.
+
+# Paths (relative to project root; adjust when running in Colab)
+paths:
+  train_data: "data/qa_train.jsonl"
+  val_data: "data/qa_val.jsonl"
+  output_dir: "results/lora_adapter"
+
+# Hugging Face Hub
+hub:
+  push_to_hub: true
+  repo_id: "Mehboobali512/trustworthy-slm-agent-qwen2.5-1.5b"
