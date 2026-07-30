@@ -11,6 +11,7 @@ Requires (installed separately, typically in Colab):
 """
 
 import argparse
+import inspect
 import yaml
 import torch
 from datasets import load_dataset
@@ -88,6 +89,27 @@ def main():
 
     formatting_func = build_formatting_func(tokenizer, cfg["system_prompt"])
 
+    # trl renamed SFTConfig's sequence-length argument from `max_seq_length`
+    # to `max_length` starting in v0.16.0. Detect which one this installed
+    # version actually accepts so the script keeps working across versions.
+    sftconfig_params = inspect.signature(SFTConfig.__init__).parameters
+    if "max_length" in sftconfig_params:
+        seq_len_kwarg = {"max_length": cfg["training"]["max_seq_length"]}
+    elif "max_seq_length" in sftconfig_params:
+        seq_len_kwarg = {"max_seq_length": cfg["training"]["max_seq_length"]}
+    else:
+        print("Warning: neither 'max_length' nor 'max_seq_length' found in "
+              "SFTConfig signature for this trl version; skipping this arg.")
+        seq_len_kwarg = {}
+
+    # transformers renamed `evaluation_strategy` -> `eval_strategy` around v4.46.
+    if "eval_strategy" in sftconfig_params:
+        eval_strategy_kwarg = {"eval_strategy": cfg["training"]["eval_strategy"]}
+    elif "evaluation_strategy" in sftconfig_params:
+        eval_strategy_kwarg = {"evaluation_strategy": cfg["training"]["eval_strategy"]}
+    else:
+        eval_strategy_kwarg = {}
+
     training_args = SFTConfig(
         output_dir=cfg["paths"]["output_dir"],
         num_train_epochs=cfg["training"]["num_train_epochs"],
@@ -97,9 +119,7 @@ def main():
         lr_scheduler_type=cfg["training"]["lr_scheduler_type"],
         warmup_ratio=cfg["training"]["warmup_ratio"],
         weight_decay=cfg["training"]["weight_decay"],
-        max_seq_length=cfg["training"]["max_seq_length"],
         logging_steps=cfg["training"]["logging_steps"],
-        eval_strategy=cfg["training"]["eval_strategy"],
         save_strategy=cfg["training"]["save_strategy"],
         save_total_limit=cfg["training"]["save_total_limit"],
         seed=cfg["training"]["seed"],
@@ -107,6 +127,8 @@ def main():
         report_to="none",
         push_to_hub=cfg["hub"]["push_to_hub"],
         hub_model_id=cfg["hub"]["repo_id"] if cfg["hub"]["push_to_hub"] else None,
+        **seq_len_kwarg,
+        **eval_strategy_kwarg,
     )
 
     trainer = SFTTrainer(
