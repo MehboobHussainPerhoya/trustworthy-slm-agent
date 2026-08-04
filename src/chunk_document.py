@@ -31,6 +31,16 @@ SECTION_PATTERNS = [
     r"^4\.2 Explicit confidence targets",
     r"^5 Discussion and limitations",
     r"^6 Conclusions",
+    r"^References",
+    r"^A Proof of the main theorem",
+    r"^B Arbitrary-facts analysis",
+    r"^C Poor-model analysis",
+    r"^D Computationally intractable hallucinations",
+    r"^E Post-training analysis",
+    r"^F Current grading of uncertain responses",
+    r"^F\.1 HELM Capabilities Benchmark",
+    r"^F\.2 Open LLM Leaderboard",
+    r"^F\.3 SWE-bench and Humanity\u2019s Last Exam",
 ]
 
 MAX_WORDS_PER_CHUNK = 350  # sub-split long sections further
