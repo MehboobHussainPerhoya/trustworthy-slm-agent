@@ -12,6 +12,7 @@ Usage (from project root):
 
 import argparse
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import faiss
@@ -21,9 +22,12 @@ from sentence_transformers import SentenceTransformer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 
+from hallucination_check import check_hallucination
+
 INDEX_DIR = Path("data/index")
 BASE_MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
 ADAPTER_REPO = "Mehboobali512/trustworthy-slm-agent-qwen2.5-1.5b"  # your HF adapter
+HALLUCINATION_LOG_PATH = Path("results/hallucination_log.jsonl")
 
 SYSTEM_PROMPT = (
     "You are a helpful assistant with expert knowledge of the paper "
@@ -130,14 +134,36 @@ class Agent:
     def ask(self, question: str, k: int = TOP_K) -> dict:
         retrieved = self.retriever.retrieve(question, k=k)
         answer = self.generator.generate(question, retrieved)
-        return {
+
+        context_text = "\n\n".join(c["text"] for c in retrieved)
+        check_result = check_hallucination(answer, context_text)
+
+        result = {
             "question": question,
             "answer": answer,
+            "verdict": check_result["verdict"],
+            "sentence_results": check_result["sentence_results"],
             "sources": [
                 {"section": c["section"], "score": round(c["score"], 3), "text": c["text"][:200] + "..."}
                 for c in retrieved
             ],
         }
+        self._log(result)
+        return result
+
+    @staticmethod
+    def _log(result: dict):
+        """Appends this interaction to the hallucination log for later analysis (FR3.4)."""
+        HALLUCINATION_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        log_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "question": result["question"],
+            "answer": result["answer"],
+            "verdict": result["verdict"],
+            "sources": [s["section"] for s in result["sources"]],
+        }
+        with open(HALLUCINATION_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
 
 
 def main():
@@ -165,7 +191,18 @@ def main():
 
 def print_result(result: dict):
     print(f"\nA: {result['answer']}\n")
-    print("Sources retrieved:")
+
+    verdict = result["verdict"]
+    if verdict == "supported":
+        print("✓ Verdict: SUPPORTED — this answer is grounded in the retrieved sources.")
+    elif verdict == "partially_supported":
+        print("⚠ Verdict: PARTIALLY SUPPORTED — some claims in this answer are not")
+        print("  directly confirmed by the retrieved sources. Treat with some caution.")
+    else:
+        print("✗ Verdict: UNSUPPORTED — this answer appears to contradict or go beyond")
+        print("  what the retrieved sources actually say. This may be a hallucination.")
+
+    print("\nSources retrieved:")
     for s in result["sources"]:
         print(f"  - [{s['section']}] (score: {s['score']}) {s['text']}")
     print()

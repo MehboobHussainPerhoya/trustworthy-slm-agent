@@ -1,0 +1,20 @@
+{"question": "Why do language models hallucinate according to this paper?", "in_scope": true}
+{"question": "What is the singleton rate?", "in_scope": true}
+{"question": "Does RAG fully solve hallucination?", "in_scope": true}
+{"question": "What is the Is-It-Valid (IIV) problem?", "in_scope": true}
+{"question": "What confidence threshold values do the authors suggest?", "in_scope": true}
+{"question": "What is behavioral calibration?", "in_scope": true}
+{"question": "How many of the ten benchmarks reviewed give credit for saying I don't know?", "in_scope": true}
+{"question": "What trigram model example does the paper use?", "in_scope": true}
+{"question": "What is the Good-Turing estimator?", "in_scope": true}
+{"question": "What is GIGO in the context of this paper?", "in_scope": true}
+{"question": "What is the capital of France?", "in_scope": false}
+{"question": "How does photosynthesis work?", "in_scope": false}
+{"question": "According to this paper, what is the best treatment for the common cold?", "in_scope": false}
+{"question": "What does this paper say about the current price of Bitcoin?", "in_scope": false}
+{"question": "Does this paper discuss reinforcement learning for robotics?", "in_scope": false}
+{"question": "What programming language do the authors recommend for implementing their theory?", "in_scope": false}
+{"question": "According to the paper, who won the most recent World Cup?", "in_scope": false}
+{"question": "What does this paper say about climate change policy?", "in_scope": false}
+{"question": "What is the paper's stance on quantum computing hardware?", "in_scope": false}
+{"question": "What historical events from the 1800s does this paper reference?", "in_scope": false}
