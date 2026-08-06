@@ -1,0 +1,19 @@
+{
+  "total_questions": 20,
+  "verdict_distribution": {
+    "unsupported": 2,
+    "supported": 7,
+    "partially_supported": 11
+  },
+  "in_scope": {
+    "count": 10,
+    "correct_(supported)": 6,
+    "accuracy": 0.6
+  },
+  "out_of_scope": {
+    "count": 10,
+    "correct_(refused_or_flagged)": 10,
+    "appropriate_abstention_rate": 1.0
+  },
+  "overall_hallucination_rate": 0.2
+}

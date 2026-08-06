@@ -1,0 +1,12 @@
+{
+  "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "training_examples": 116,
+  "val_examples": 25,
+  "epochs": 3,
+  "final_train_loss": 1.171,
+  "eval_loss_by_epoch": {"1": 1.534, "2": 1.244, "3": 1.228},
+  "eval_token_accuracy_by_epoch": {"1": 0.712, "2": 0.7632, "3": 0.7653},
+  "trainable_params": 18464768,
+  "total_params": 1562179072,
+  "trainable_param_pct": 1.182
+}
