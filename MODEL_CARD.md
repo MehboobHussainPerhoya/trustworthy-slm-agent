@@ -7,7 +7,7 @@
 - **Base model:** Qwen/Qwen2.5-1.5B-Instruct
 - **Fine-tuning method:** LoRA (rank 16, alpha 32, dropout 0.05), applied to: q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj
 - **Adapter repository:** Mehboobali512/trustworthy-slm-agent-qwen2.5-1.5b
-- **Developed by:** [Your Name]
+- **Developed by:** [Mehboob Hussain]
 - **Model type:** Causal language model, instruction-tuned for narrow-domain Q&A
 - **Language:** English
 
