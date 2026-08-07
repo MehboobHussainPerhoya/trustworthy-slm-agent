@@ -21,7 +21,11 @@ from transformers import (
     BitsAndBytesConfig,
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from trl import SFTTrainer, SFTConfig
+# from trl import SFTTrainer, SFTConfig
+from trl.trainer.sft_config import SFTConfig
+from trl.trainer.sft_trainer import SFTTrainer
+from typing import Any, cast
+from peft import PeftModel
 
 
 def load_config(path: str) -> dict:
@@ -78,7 +82,7 @@ def main():
         bias=cfg["lora"]["bias"],
         task_type=cfg["lora"]["task_type"],
     )
-    model = get_peft_model(model, lora_config)
+    model = cast(PeftModel, get_peft_model(model, lora_config))
     model.print_trainable_parameters()
 
     print("Loading datasets...")
@@ -131,6 +135,7 @@ def main():
         **eval_strategy_kwarg,
     )
 
+
     trainer = SFTTrainer(
         model=model,
         args=training_args,
@@ -138,6 +143,7 @@ def main():
         eval_dataset=val_ds,
         formatting_func=formatting_func,
     )
+
 
     print("Starting training...")
     trainer.train()

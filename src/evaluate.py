@@ -22,6 +22,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 
+
 BASE_MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
 ADAPTER_REPO = "Mehboobali512/trustworthy-slm-agent-qwen2.5-1.5b"
 TEST_SET_PATH = Path("data/qa_test.jsonl")
