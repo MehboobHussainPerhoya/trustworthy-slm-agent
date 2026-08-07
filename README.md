@@ -1,67 +1,62 @@
 # Trustworthy SLM Agent
 
-A small language model, fine-tuned on a single research paper, wrapped as a
-retrieval-grounded agent with automated hallucination detection and bias
-auditing — built end-to-end on free-tier compute as a demonstration of
-responsible AI deployment practices.
+This project fine-tunes a small language model on a single research paper,
+then wraps it with retrieval, automated hallucination checking, and a bias
+audit — basically everything I could realistically build on free-tier
+compute to answer one question: fine-tuning aside, can I actually trust
+what this model says, and how would I know if I couldn't?
 
-**Domain:** The agent answers questions about *"Why Language Models
-Hallucinate"* (Kalai, Nachum, Vempala, and Zhang, 2025), arXiv:2509.04664.
-The project is intentionally self-referential: an AI-safety-audited agent
-that explains the theory of why models hallucinate.
+The paper I picked is *"Why Language Models Hallucinate"* by Kalai,
+Nachum, Vempala, and Zhang (2025, arXiv:2509.04664). Using that specific
+paper felt right for this project — the agent is essentially being tested
+against the exact theory it was trained to explain, so when it messes up,
+the mistake is directly readable against the paper's own framework.
 
-**Live demo:** temporary Colab-hosted public link (active while the Colab
-session is running): see [Live Demo](#live-demo) below. Permanent
-Hugging Face Spaces (ZeroGPU) deployment is planned once account
-eligibility is confirmed.
+## What it actually does
 
----
-
-## Why this project
-
-Most SLM fine-tuning tutorials stop at "here's your fine-tuned model."
-This project asks the next question: **is it safe and honest to deploy?**
-It fine-tunes a 1.5B model, then builds three layers on top of it —
-retrieval grounding, automated hallucination checking, and bias auditing —
-and reports the *real*, sometimes imperfect, results of each layer rather
-than only showcasing successes.
-
-## Architecture
+You ask it a question about the paper. It searches a small FAISS index
+built from the paper's text, pulls the most relevant paragraphs, and feeds
+those to a LoRA-fine-tuned Qwen2.5-1.5B model along with your question. The
+answer that comes back then gets checked against those same retrieved
+paragraphs using an NLI model — basically asking "does this answer
+actually follow from what we just gave it, or did it wander off and make
+something up?" If the answer doesn't hold up, it gets withheld and the app
+tells you so, instead of quietly showing you something that sounds
+confident but isn't backed by anything.
 
 ```
-User question
-      │
-      ▼
-┌─────────────┐     ┌──────────────────┐     ┌───────────────────┐
-│  Retriever   │────▶│  Fine-tuned SLM   │────▶│ Hallucination Check│
-│ (FAISS +     │     │ (Qwen2.5-1.5B +   │     │ (NLI entailment,   │
-│  MiniLM      │     │  LoRA adapter)    │     │  DeBERTa-v3-mnli)  │
-│  embeddings) │     │                   │     │                    │
-└─────────────┘     └──────────────────┘     └───────────────────┘
-                                                          │
-                                                          ▼
-                                    Verdict-gated response:
-                                    supported → show answer
-                                    partially supported → show with caution
-                                    unsupported → withhold, explain why
+question
+   │
+   ▼
+retrieve relevant paragraphs (FAISS + MiniLM embeddings)
+   │
+   ▼
+generate answer (fine-tuned Qwen2.5-1.5B + LoRA adapter)
+   │
+   ▼
+check answer against retrieved paragraphs (DeBERTa NLI model)
+   │
+   ▼
+supported → show it
+partially supported → show it, but flagged
+unsupported → don't show it, explain why not
 ```
 
-## Repo Structure
+## Repo layout
 
 ```
-trustworthy-slm-agent/
-├── app/gradio_app.py          # Gradio UI (Phase 8)
-├── configs/lora_config.yaml   # LoRA + training hyperparameters
-├── data/                      # source text, chunks, Q&A pairs, indices
-├── docs/SPEC.md               # full functional specification
-├── notebooks/                 # Colab fine-tuning notebooks
-├── results/                   # all evaluation outputs and analysis writeups
-├── src/                       # all pipeline scripts (see below)
-├── tests/test_pipeline.py     # smoke tests
-└── MODEL_CARD.md              # auto-generated model card
+app/gradio_app.py       the web UI
+configs/lora_config.yaml LoRA + training settings
+data/                     source text, chunks, Q&A pairs, the FAISS index
+docs/SPEC.md              the original planning doc for this project
+notebooks/                Colab notebooks used for training
+results/                  every eval output and my write-ups on what they mean
+src/                      all the actual pipeline scripts
+tests/test_pipeline.py    smoke tests
+MODEL_CARD.md             auto-generated model card
 ```
 
-## Setup (Windows / VS Code)
+## Getting it running
 
 ```powershell
 git clone https://github.com/MehboobHussainPerhoya/trustworthy-slm-agent.git
@@ -71,142 +66,137 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-Heavy/GPU-dependent steps (fine-tuning, agent generation, evaluation) are
-designed to run on free-tier Google Colab, not the local machine. See
-`docs/SPEC.md` for the full phase-by-phase pipeline and exact Colab setup
-commands.
+Fair warning: the heavy stuff (fine-tuning, running the agent, the eval
+scripts) needs a GPU, and my machine doesn't have one, so all of that runs
+in Colab on the free T4 tier. The local setup here is mostly for editing
+code and the lightweight, CPU-only steps like chunking the source text and
+building the retrieval index. `docs/SPEC.md` has the full breakdown of
+what runs where.
 
-## Pipeline / How to Reproduce
+## How the pieces fit together, in order
 
-| Step | Script | What it does |
-|---|---|---|
-| 1 | `src/extract_text.py` | Extract text from the source PDF |
-| 2 | `src/chunk_document.py` | Split into 55 labeled section chunks |
-| 3 | `src/split_dataset.py` | 70/15/15 train/val/test split of Q&A pairs |
-| 4 | `src/finetune.py` | LoRA fine-tune Qwen2.5-1.5B-Instruct |
-| 5 | `src/build_index.py` | Build FAISS retrieval index |
-| 6 | `src/agent.py` | Retrieval-grounded agent (CLI or import) |
-| 7 | `src/evaluate_hallucination.py` | Hallucination eval harness |
-| 8 | `src/bias_audit.py` | Gender + nationality bias audit |
-| 9 | `src/evaluate.py` | Base vs. fine-tuned F1/latency benchmark |
-| 10 | `src/generate_model_card.py` | Auto-generate `MODEL_CARD.md` |
-| 11 | `app/gradio_app.py` | Web UI |
+1. `src/extract_text.py` — pulls text out of the source PDF
+2. `src/chunk_document.py` — splits it into 55 labeled sections
+3. `src/split_dataset.py` — 70/15/15 split of the Q&A dataset
+4. `src/finetune.py` — LoRA fine-tunes Qwen2.5-1.5B-Instruct
+5. `src/build_index.py` — builds the FAISS retrieval index
+6. `src/agent.py` — the actual retrieval + generation + checking agent
+7. `src/evaluate_hallucination.py` — runs the hallucination eval set
+8. `src/bias_audit.py` — the gender/nationality bias probes
+9. `src/evaluate.py` — base vs. fine-tuned comparison on held-out data
+10. `src/generate_model_card.py` — builds `MODEL_CARD.md` from all the results
+11. `app/gradio_app.py` — the demo itself
 
 ## Results
 
-### Fine-Tuning (Phase 2)
+I'll just go through what I actually found, including the parts that
+weren't clean wins.
 
-LoRA fine-tune of `Qwen/Qwen2.5-1.5B-Instruct` (r=16, alpha=32) on 116
-human-reviewed Q&A pairs, 3 epochs, free Colab T4 GPU.
+**Fine-tuning.** Trained on 116 examples for 3 epochs. Eval loss dropped
+from 1.53 to 1.23 across the three epochs, and token accuracy went from
+71% to about 76.5%, mostly in the first two epochs — by epoch 3 it had
+basically leveled off. Only about 1.2% of the model's parameters were
+actually being trained (LoRA on a 1.5B model), which is the whole point of
+doing it this way on free compute.
 
-| Epoch | Eval Loss | Eval Token Accuracy |
-|---|---|---|
-| 1 | 1.534 | 71.2% |
-| 2 | 1.244 | 76.3% |
-| 3 | 1.228 | 76.5% |
+**Did fine-tuning actually help?** I checked this properly on the 26
+held-out test questions the model never saw during training, scoring
+answers against the reference answers with token F1. Base model averaged
+0.135, fine-tuned averaged 0.185 — about a 38% relative improvement.
+Fine-tuned answers were also faster to generate (6.9s vs 10.3s on
+average), probably because they're more concise. Not every question got
+better — both RAG-related questions actually scored worse after
+fine-tuning — but the overall trend was a real, measurable improvement,
+not just something I'm eyeballing from a couple of examples.
 
-Trainable parameters: 18,464,768 / 1,562,179,072 (1.18%).
+**Does the hallucination checker actually catch anything?** This is the
+part I was most curious about. I built a 20-question eval set — 10
+answerable from the paper, 10 deliberately not (things like "what's the
+capital of France," which the agent has no business answering
+confidently). The out-of-scope questions were caught 100% of the time —
+every single one either got refused outright or flagged as not backed by
+the retrieved sources. That's the result I care about most, since it's
+the actual safety property this whole project is trying to demonstrate.
 
-### Base vs. Fine-Tuned Benchmark (Phase 7)
+The in-scope accuracy was lower, 60%, which sounds worse than it is once
+you actually read the failures. I went through all of them by hand: two
+of the "not fully supported" verdicts turned out to be correct answers
+that the checker was just being overly strict about (it didn't like that
+the wording didn't match the source text closely enough, even though the
+meaning was right). One was a genuine mix-up where the model conflated
+two different examples from the paper and probably should have been
+flagged more strongly than it was. And separately, the checker correctly
+caught a real hallucination in the model's answer to its own most
+important question — "why do language models hallucinate" — where it
+claimed something about calibration that actually contradicts what the
+paper says. That one felt like a good sign the system works, even though
+the raw accuracy number looks middling.
 
-Evaluated on the full 26-question held-out test set, token-level F1 against
-reference answers:
+**Bias audit.** I tested two things: whether the model associates certain
+occupations with a gender, and whether it describes different
+nationalities with different sentiment. For occupations, the answer is
+yes, pretty clearly — 19 out of 20 occupations I tested showed a skew in
+the stereotype-consistent direction (mechanic skewed hard toward "he,"
+babysitter hard toward "she," and so on), with two interesting exceptions:
+hairdresser actually skewed toward "he," and flight attendant came out
+exactly neutral despite a pretty strong historical stereotype. For
+nationality, I didn't find much difference in sentiment across the groups
+I tested, but I don't think that means there's no bias there — the
+completions were pretty formulaic across the board ("very polite," "strong
+sense of family," that kind of thing), which makes me think the sentiment
+score just isn't sensitive enough to pick up on subtler stuff. I wrote
+this up honestly rather than calling it a clean pass.
 
-| Metric | Base Model | Fine-Tuned | Change |
-|---|---|---|---|
-| Mean token F1 | 0.135 | 0.185 | **+0.051 (≈38% relative)** |
-| Mean latency | 10.34s | 6.86s | **33% faster** |
-| Model size | ~1.5B params | +37MB LoRA adapter | — |
+Full details and the actual plot are in `results/bias_audit_analysis.md`
+and `results/bias_audit_plot.png`.
 
-19 of 26 test questions improved with fine-tuning; a few regressed
-(notably both RAG-related questions) — reported honestly rather than
-cherry-picked.
+## Live demo
 
-### Hallucination Detection (Phase 4)
+The agent is deployed as a Gradio app that gates its own answers by the
+hallucination verdict — if the checker says an answer isn't backed by the
+retrieved sources, the app doesn't show it, it explains why it's holding
+back instead. I tested this live with a couple of questions clearly
+outside the paper's scope and it worked as intended.
 
-NLI-based entailment checking (`MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli`)
-against retrieved context, evaluated on 20 questions (10 in-scope,
-10 deliberately out-of-scope):
+Right now the demo runs on a temporary Colab-hosted link rather than a
+permanent one, because Hugging Face Spaces now requires either a paid plan
+or meeting their free ZeroGPU eligibility bar, and getting that sorted out
+turned into more of a detour than I expected. I'll move it to a permanent
+Spaces deployment once that's resolved. In the meantime the app code is
+in `app/gradio_app.py` and runs fine from Colab if you want to spin it up
+yourself.
 
-| Metric | Result |
-|---|---|
-| In-scope accuracy (verdict = "supported") | 60% |
-| Out-of-scope appropriate abstention/flagging | **100%** |
-| Overall hallucination rate | 20% |
+## What I'd still change
 
-**Key finding:** the checker correctly flagged a real hallucination in the
-agent's answer to its own most central question ("why do models
-hallucinate") — the model claimed models "lack calibrated belief
-estimates," which actually contradicts the paper's finding that base
-models tend to be well-calibrated. Manual review also found the checker to
-be conservative (some correct paraphrased answers scored only "partially
-supported") and to have missed at least one genuine factual conflation —
-documented honestly in `results/hallucination_eval_analysis.md`.
+- The Q&A dataset is small (166 pairs after I caught and removed a
+  duplicate a smoke test flagged). Facts that only showed up once or
+  twice in training aren't reliably learned — retrieval grounding helps
+  with this but doesn't fully fix it.
+- The hallucination checker isn't a source of ground truth. It's
+  conservative in a way that sometimes marks down correct answers, and it
+  missed at least one real mistake in my manual review. Useful signal,
+  not a verdict to trust blindly.
+- There's real, measurable gender bias in how the model talks about
+  occupations. That's coming from the base model's pretraining, not
+  something this project's fine-tuning introduced, but it's still there
+  and worth being upfront about.
+- The nationality/sentiment bias check probably isn't sensitive enough as
+  designed. A better version would look at what's actually being said
+  about each group, not just whether it scores positive or negative.
+- This only knows about one paper. Asking it about anything else is
+  exactly what the out-of-scope testing is meant to catch, and it does,
+  but it's worth saying plainly: this isn't a general-purpose assistant.
 
-### Bias Audit (Phase 5)
+## Model card
 
-Two axes tested on the fine-tuned model:
+The full auto-generated model card is in [`MODEL_CARD.md`](MODEL_CARD.md).
+It gets regenerated from the actual result files any time I rerun
+`src/generate_model_card.py`, so it stays in sync with whatever the
+current numbers actually are rather than going stale.
 
-- **Gender-occupation** (20 occupations): strong, stereotype-consistent
-  pronoun skew in 19/20 occupations (e.g. mechanic skews strongly toward
-  "he," babysitter strongly toward "she"). Two notable exceptions:
-  hairdresser skews counter-stereotypically toward "he"; flight attendant
-  shows exactly zero skew.
-- **Nationality sentiment** (18 groups): no meaningful variance detected
-  (all near-maximum positive) — likely reflects a coarse sentiment
-  classifier's limitation rather than genuine absence of bias.
+## Data and licensing
 
-Full details, plot, and interpretation: `results/bias_audit_analysis.md`,
-`results/bias_audit_plot.png`.
-
-## Live Demo
-
-The agent is deployed as a Gradio app. Answers are gated by hallucination
-verdict — "unsupported" answers are withheld entirely rather than shown
-with just a warning label, and "partially supported" answers are shown
-with an explicit caution prefix.
-
-Currently hosted via a temporary Colab `share=True` public link (see
-project maintainer for current active link, or run
-`app/gradio_app.py` yourself in Colab per `docs/SPEC.md`). Permanent
-Hugging Face Spaces (ZeroGPU) deployment is pending account eligibility
-confirmation.
-
-## Known Limitations
-
-1. Small fine-tuning dataset (167 Q&A pairs) — sparse technical facts
-   appearing in only 1-2 training examples are not reliably learned by
-   fine-tuning alone; retrieval grounding mitigates but does not
-   eliminate this.
-2. The hallucination checker is conservative and imperfect — it can
-   under-score correct paraphrased answers, and has been observed to miss
-   at least one genuine factual error. It is not a ground-truth oracle.
-3. Measurable gender bias is present in the model, inherited primarily
-   from the base model's pretraining, not introduced by this project's
-   narrow fine-tuning.
-4. The nationality-sentiment bias axis is likely under-measured by a
-   coarse sentiment classifier; a content/stereotype-specific analysis
-   would be a more rigorous follow-up.
-5. Narrow domain only — this model is not evaluated and not intended for
-   use outside questions about this specific paper.
-6. Live demo hosting is currently temporary (Colab-hosted), pending
-   permanent free-tier deployment eligibility.
-
-## Full Model Card
-
-See [`MODEL_CARD.md`](MODEL_CARD.md) for the complete auto-generated model
-card, and `docs/SPEC.md` for the full functional specification this
-project was built against.
-
-## Future Work
-
-- Expand the Q&A dataset to improve coverage of sparse/technical concepts.
-- Content-level (not just sentiment-polarity) bias analysis.
-- Permanent Hugging Face Spaces ZeroGPU deployment.
-- Multi-document support beyond the single source paper.
-
-## License / Data Provenance
-
-Source paper: Kalai et al. (2025), CC BY 4.0, arXiv:2509.04664. See
-`data/README.md` for full provenance of derived data. Code in this
-repository is provided for educational/portfolio purposes.
+The source paper is CC BY 4.0 (Kalai et al., 2025, arXiv:2509.04664), so
+using it here is fine — I've documented exactly how it was processed and
+what's derived from it in `data/README.md`. The PDF itself isn't checked
+into this repo; only the extracted text and everything built from it are.
